@@ -1,0 +1,10 @@
+# Supabase接続情報（絶対にGitHubにpushしない）
+config.js
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp

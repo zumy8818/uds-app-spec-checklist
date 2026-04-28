@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>App Overview | UDS</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./config.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f5f5; --bg-card: #ffffff; --text: #1a1a1a; --text-sub: #666;
+    --text-hint: #999; --border: rgba(0,0,0,0.1); --border-em: rgba(0,0,0,0.2);
+    --blue: #185FA5; --blue-light: #E6F1FB; --blue-text: #0C447C;
+    --green-light: #EAF3DE; --green-text: #3B6D11;
+    --amber-light: #FAEEDA; --amber-text: #854F0B;
+    --gray-light: #F1EFE8; --gray-text: #5F5E5A;
+    --red: #A32D2D; --red-light: #FCEBEB;
+    --radius: 8px; --radius-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111; --bg-card: #1e1e1e; --text: #f0f0f0; --text-sub: #aaa;
+      --text-hint: #666; --border: rgba(255,255,255,0.1); --border-em: rgba(255,255,255,0.2);
+      --blue-light: #0C447C; --blue-text: #85B7EB;
+      --green-light: #173404; --green-text: #97C459;
+      --amber-light: #412402; --amber-text: #FAC775;
+      --gray-light: #2C2C2A; --gray-text: #B4B2A9;
+      --red-light: #501313;
+    }
+  }
+  body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .topbar { background: var(--bg-card); border-bottom: 0.5px solid var(--border); padding: 14px 16px 12px; position: sticky; top: 0; z-index: 10; }
+  .topbar h1 { font-size: 16px; font-weight: 600; }
+  .topbar p { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+  .search-bar { padding: 10px 16px; background: var(--bg-card); border-bottom: 0.5px solid var(--border); }
+  .search-bar input { width: 100%; padding: 8px 12px; font-size: 14px; border: 0.5px solid var(--border-em); border-radius: var(--radius); background: var(--bg); color: var(--text); }
+  .filter-row { display: flex; gap: 8px; padding: 10px 16px; overflow-x: auto; background: var(--bg-card); border-bottom: 0.5px solid var(--border); }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .chip { flex-shrink: 0; padding: 4px 12px; border-radius: 20px; font-size: 12px; border: 0.5px solid var(--border-em); background: var(--bg); color: var(--text-sub); cursor: pointer; }
+  .chip.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  #list { padding-bottom: 80px; }
+  .card { background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin: 10px 16px 0; padding: 14px; cursor: pointer; }
+  .card-top { display: flex; align-items: flex-start; gap: 12px; }
+  .card-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .card-meta { flex: 1; min-width: 0; }
+  .card-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-desc { font-size: 12px; color: var(--text-sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .s-運用中 { background: var(--green-light); color: var(--green-text); }
+  .s-開発中 { background: var(--blue-light); color: var(--blue-text); }
+  .s-保守のみ { background: var(--amber-light); color: var(--amber-text); }
+  .s-停止 { background: var(--gray-light); color: var(--gray-text); }
+  .card-bottom { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 0.5px solid var(--border); font-size: 11px; color: var(--text-hint); }
+  .fab { position: fixed; bottom: 24px; right: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--blue); border: none; color: #fff; font-size: 26px; cursor: pointer; z-index: 20; display: flex; align-items: center; justify-content: center; }
+  .empty { text-align: center; padding: 48px 16px; color: var(--text-sub); font-size: 14px; }
+  .loading { text-align: center; padding: 32px; color: var(--text-hint); font-size: 13px; }
+
+  /* ===== Form Panel ===== */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 30; display: none; align-items: flex-end; }
+  .overlay.open { display: flex; }
+  .panel { background: var(--bg-card); width: 100%; max-height: 92vh; border-radius: 16px 16px 0 0; overflow-y: auto; padding: 16px 16px 32px; }
+  .handle { width: 36px; height: 4px; background: var(--border-em); border-radius: 2px; margin: 0 auto 16px; }
+  .panel-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+  .form-label { font-size: 12px; color: var(--text-sub); margin-bottom: 4px; display: block; }
+  .form-group { margin-bottom: 12px; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 9px 12px; font-size: 14px; border: 0.5px solid var(--border-em);
+    border-radius: var(--radius); background: var(--bg); color: var(--text); font-family: inherit;
+  }
+  .form-group textarea { resize: vertical; min-height: 72px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn-row { display: flex; gap: 8px; margin-top: 16px; }
+  .btn { flex: 1; padding: 10px; border-radius: var(--radius); font-size: 14px; cursor: pointer; border: 0.5px solid var(--border-em); background: var(--bg); color: var(--text); font-family: inherit; }
+  .btn-primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .btn-danger { color: var(--red); border-color: var(--red-light); }
+
+  /* ===== Detail Panel ===== */
+  .detail-panel { position: fixed; inset: 0; background: var(--bg); z-index: 30; display: none; overflow-y: auto; }
+  .detail-panel.open { display: block; }
+  .detail-header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 0.5px solid var(--border); position: sticky; top: 0; background: var(--bg-card); z-index: 1; }
+  .back-btn { width: 32px; height: 32px; border-radius: 50%; background: var(--bg); border: 0.5px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; }
+  .detail-body { padding: 16px 16px 40px; }
+  .detail-section { margin-bottom: 20px; }
+  .section-title { font-size: 11px; font-weight: 500; color: var(--text-hint); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 0.5px solid var(--border); }
+  .drow { display: flex; justify-content: space-between; align-items: flex-start; padding: 6px 0; }
+  .dkey { font-size: 12px; color: var(--text-sub); flex-shrink: 0; width: 110px; }
+  .dval { font-size: 13px; text-align: right; word-break: break-all; }
+  .dval a { color: var(--blue); text-decoration: none; }
+  .memo-box { font-size: 13px; line-height: 1.7; background: var(--bg); border-radius: var(--radius); padding: 12px; border: 0.5px solid var(--border); white-space: pre-wrap; }
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 8px 18px; border-radius: 20px; font-size: 13px; z-index: 50; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>App Overview</h1>
+  <p id="count-label">読み込み中...</p>
+</div>
+<div class="search-bar">
+  <input type="text" id="search" placeholder="アプリ名・スタックで検索..." oninput="render()">
+</div>
+<div class="filter-row">
+  <div class="chip active" onclick="setFilter('all',this)">すべて</div>
+  <div class="chip" onclick="setFilter('運用中',this)">運用中</div>
+  <div class="chip" onclick="setFilter('開発中',this)">開発中</div>
+  <div class="chip" onclick="setFilter('保守のみ',this)">保守のみ</div>
+  <div class="chip" onclick="setFilter('停止',this)">停止</div>
+</div>
+<div id="list"><div class="loading">読み込み中...</div></div>
+
+<button class="fab" onclick="openNew()">+</button>
+
+<!-- Form Overlay -->
+<div class="overlay" id="form-overlay" onclick="closeFormOverlay(event)">
+  <div class="panel">
+    <div class="handle"></div>
+    <div class="panel-title" id="form-title">新しいアプリを登録</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">アプリ名 *</label>
+        <input type="text" id="f-name" placeholder="例: FS-inventory-app">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ステータス</label>
+        <select id="f-status">
+          <option>開発中</option><option>運用中</option><option>保守のみ</option><option>停止</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">一言説明</label>
+      <input type="text" id="f-desc" placeholder="何をするアプリか">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">技術スタック</label>
+        <input type="text" id="f-stack" placeholder="例: PHP / MySQL">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ホスティング</label>
+        <input type="text" id="f-hosting" placeholder="例: Lolipop">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">URL / デプロイ先</label>
+      <input type="text" id="f-url" placeholder="https://...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">GitHubリポジトリ</label>
+      <input type="text" id="f-github" placeholder="zumy8818/リポジトリ名">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">開始日</label>
+        <input type="date" id="f-start">
+      </div>
+      <div class="form-group">
+        <label class="form-label">リリース日</label>
+        <input type="date" id="f-date">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">引継ぎメモ（忘れたくないことを自由に）</label>
+      <textarea id="f-memo" placeholder="APIキーの場所、注意点、将来の予定など"></textarea>
+    </div>
+    <div class="btn-row">
+      <button class="btn" onclick="closeForm()">キャンセル</button>
+      <button class="btn btn-danger" id="del-btn" onclick="deleteApp()" style="display:none">削除</button>
+      <button class="btn btn-primary" onclick="saveApp()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Panel -->
+<div class="detail-panel" id="detail-panel">
+  <div class="detail-header">
+    <div class="back-btn" onclick="closeDetail()">←</div>
+    <div style="flex:1; min-width:0">
+      <div id="d-name" style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+      <div id="d-badge" style="margin-top:3px"></div>
+    </div>
+    <button class="btn" style="width:auto;padding:6px 14px;font-size:13px;flex:none" onclick="openEdit()">編集</button>
+  </div>
+  <div class="detail-body">
+    <div class="detail-section">
+      <div class="section-title">基本情報</div>
+      <div class="drow"><span class="dkey">説明</span><span class="dval" id="d-desc"></span></div>
+      <div class="drow"><span class="dkey">開始日</span><span class="dval" id="d-start"></span></div>
+      <div class="drow"><span class="dkey">リリース日</span><span class="dval" id="d-date"></span></div>
+    </div>
+    <div class="detail-section">
+      <div class="section-title">技術・インフラ</div>
+      <div class="drow"><span class="dkey">スタック</span><span class="dval" id="d-stack"></span></div>
+      <div class="drow"><span class="dkey">ホスティング</span><span class="dval" id="d-hosting"></span></div>
+      <div class="drow"><span class="dkey">URL</span><span class="dval" id="d-url"></span></div>
+      <div class="drow"><span class="dkey">GitHub</span><span class="dval" id="d-github"></span></div>
+    </div>
+    <div class="detail-section" id="d-memo-section">
+      <div class="section-title">引継ぎメモ</div>
+      <div class="memo-box" id="d-memo"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// Supabase 設定 — config.js から読み込む（このファイルは .gitignore）
+// ============================================================
+// config.js が存在しない場合はデモモードで動作
+let sbClient = null;
+
+async function initSupabase() {
+  try {
+    const res = await fetch('./config.js');
+    if (!res.ok) throw new Error('config.js not found');
+    // config.js が存在すれば window.SUPABASE_URL / window.SUPABASE_ANON_KEY がセットされる
+    await import('./config.js').catch(() => {});
+    if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+      sbClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+// ============================================================
+// データ管理（Supabase / ローカルフォールバック）
+// ============================================================
+let apps = [];
+let editingId = null;
+let detailApp = null;
+let currentFilter = 'all';
+let useSupabase = false;
+
+const DEMO_DATA = [
+  { id: 1, name: 'FS-inventory-app', status: '運用中', description: 'フォーシーズンの棚卸をスマホで入力・集計', stack: 'Node.js / MySQL', hosting: 'Lolipop', url: 'https://ubuyama-digital-service.com/FS/', github: 'zumy8818/FS-inventory-app', start_date: '2024-08-01', release_date: '2024-10-01', memo: 'Smaregi連携は将来実装予定。DBはLAA1380072。' },
+  { id: 2, name: 'uds-app-website-generator', status: '開発中', description: 'ヒアリングデータからデモサイトを自動生成', stack: 'Node.js / Anthropic API / MySQL', hosting: 'Lolipop + Replit', url: '', github: 'zumy8818/uds-app-website-generator', start_date: '2024-11-01', release_date: '', memo: 'APIキーはGitHub Secretsに設定済み。本番はLolipop PHP経由でリクエスト。' },
+  { id: 3, name: 'LP-checksheet', status: '運用中', description: 'LP制作前の確認チェックシート', stack: '静的HTML', hosting: 'GitHub Pages', url: 'https://zumy8818.github.io/LP-checksheet/', github: 'zumy8818/LP-checksheet', start_date: '2024-06-01', release_date: '2024-06-15', memo: '' },
+];
+
+async function loadApps() {
+  if (useSupabase) {
+    const { data, error } = await sbClient.from('apps').select('*').order('created_at', { ascending: false });
+    if (error) { showToast('読み込みエラー'); return; }
+    apps = data;
+  } else {
+    apps = [...DEMO_DATA];
+  }
+  render();
+}
+
+async function insertApp(data) {
+  if (useSupabase) {
+    const { data: row, error } = await sbClient.from('apps').insert([data]).select().single();
+    if (error) { showToast('保存エラー: ' + error.message); return false; }
+    apps.unshift(row);
+  } else {
+    apps.unshift({ id: Date.now(), ...data });
+  }
+  return true;
+}
+
+async function updateApp(id, data) {
+  if (useSupabase) {
+    const { error } = await sbClient.from('apps').update(data).eq('id', id);
+    if (error) { showToast('更新エラー: ' + error.message); return false; }
+    const i = apps.findIndex(a => a.id === id);
+    apps[i] = { ...apps[i], ...data };
+  } else {
+    const i = apps.findIndex(a => a.id === id);
+    apps[i] = { ...apps[i], ...data };
+  }
+  return true;
+}
+
+async function removeApp(id) {
+  if (useSupabase) {
+    const { error } = await sbClient.from('apps').delete().eq('id', id);
+    if (error) { showToast('削除エラー: ' + error.message); return false; }
+  }
+  apps = apps.filter(a => a.id !== id);
+  return true;
+}
+
+// ============================================================
+// UI
+// ============================================================
+const ICONS = { '開発中': '🔧', '運用中': '✅', '保守のみ': '🔄', '停止': '⛔' };
+const ICON_BG = { '開発中': 'var(--blue-light)', '運用中': 'var(--green-light)', '保守のみ': 'var(--amber-light)', '停止': 'var(--gray-light)' };
+
+function filtered() {
+  const q = document.getElementById('search').value.toLowerCase();
+  return apps.filter(a => {
+    const matchF = currentFilter === 'all' || a.status === currentFilter;
+    const matchQ = !q || (a.name||'').toLowerCase().includes(q) || (a.stack||'').toLowerCase().includes(q) || (a.description||'').toLowerCase().includes(q);
+    return matchF && matchQ;
+  });
+}
+
+function render() {
+  const list = filtered();
+  const mode = useSupabase ? 'Supabase接続中' : 'デモモード';
+  document.getElementById('count-label').textContent = `${list.length}件　／　${mode}`;
+  const el = document.getElementById('list');
+  if (!list.length) { el.innerHTML = '<div class="empty">該当するアプリがありません</div>'; return; }
+  el.innerHTML = list.map(a => `
+    <div class="card" onclick="openDetail(${JSON.stringify(a.id)})">
+      <div class="card-top">
+        <div class="card-icon" style="background:${ICON_BG[a.status]||'var(--gray-light)'}">${ICONS[a.status]||'📦'}</div>
+        <div class="card-meta">
+          <div class="card-name">${esc(a.name)}</div>
+          <div class="card-desc">${esc(a.description||'説明なし')}</div>
+        </div>
+        <span class="badge s-${a.status}">${a.status}</span>
+      </div>
+      <div class="card-bottom">
+        <span>${esc(a.stack||'スタック未記入')}</span>
+        <span>${a.release_date||'日付未設定'}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function openNew() {
+  editingId = null;
+  document.getElementById('form-title').textContent = '新しいアプリを登録';
+  document.getElementById('del-btn').style.display = 'none';
+  ['name','desc','stack','hosting','url','github','memo'].forEach(k => document.getElementById('f-'+k).value = '');
+  document.getElementById('f-status').value = '開発中';
+  document.getElementById('f-start').value = '';
+  document.getElementById('f-date').value = '';
+  document.getElementById('form-overlay').classList.add('open');
+}
+
+function openEdit() {
+  const a = detailApp;
+  editingId = a.id;
+  document.getElementById('form-title').textContent = 'アプリを編集';
+  document.getElementById('del-btn').style.display = 'block';
+  document.getElementById('f-name').value = a.name || '';
+  document.getElementById('f-desc').value = a.description || '';
+  document.getElementById('f-status').value = a.status || '開発中';
+  document.getElementById('f-stack').value = a.stack || '';
+  document.getElementById('f-hosting').value = a.hosting || '';
+  document.getElementById('f-url').value = a.url || '';
+  document.getElementById('f-github').value = a.github || '';
+  document.getElementById('f-start').value = a.start_date || '';
+  document.getElementById('f-date').value = a.release_date || '';
+  document.getElementById('f-memo').value = a.memo || '';
+  document.getElementById('form-overlay').classList.add('open');
+}
+
+function closeFormOverlay(e) { if (e.target === document.getElementById('form-overlay')) closeForm(); }
+function closeForm() { document.getElementById('form-overlay').classList.remove('open'); }
+
+async function saveApp() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { showToast('アプリ名を入力してください'); return; }
+  const data = {
+    name,
+    status: document.getElementById('f-status').value,
+    description: document.getElementById('f-desc').value,
+    stack: document.getElementById('f-stack').value,
+    hosting: document.getElementById('f-hosting').value,
+    url: document.getElementById('f-url').value,
+    github: document.getElementById('f-github').value,
+    start_date: document.getElementById('f-start').value || null,
+    release_date: document.getElementById('f-date').value || null,
+    memo: document.getElementById('f-memo').value,
+  };
+  let ok;
+  if (editingId) {
+    ok = await updateApp(editingId, data);
+    if (ok) { detailApp = apps.find(a => a.id === editingId); refreshDetail(); }
+  } else {
+    ok = await insertApp(data);
+  }
+  if (ok) { closeForm(); render(); showToast('保存しました'); }
+}
+
+async function deleteApp() {
+  const name = document.getElementById('f-name').value;
+  if (!confirm(`"${name}" を削除しますか？`)) return;
+  const ok = await removeApp(editingId);
+  if (ok) { closeForm(); closeDetail(); render(); showToast('削除しました'); }
+}
+
+function openDetail(id) {
+  detailApp = apps.find(a => a.id === id);
+  refreshDetail();
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+function refreshDetail() {
+  const a = detailApp;
+  document.getElementById('d-name').textContent = a.name;
+  document.getElementById('d-badge').innerHTML = `<span class="badge s-${a.status}">${a.status}</span>`;
+  document.getElementById('d-desc').textContent = a.description || '—';
+  document.getElementById('d-start').textContent = a.start_date || '—';
+  document.getElementById('d-date').textContent = a.release_date || '—';
+  document.getElementById('d-stack').textContent = a.stack || '—';
+  document.getElementById('d-hosting').textContent = a.hosting || '—';
+  const urlEl = document.getElementById('d-url');
+  urlEl.innerHTML = a.url ? `<a href="${esc(a.url)}" target="_blank">${esc(a.url)}</a>` : '—';
+  const ghEl = document.getElementById('d-github');
+  ghEl.innerHTML = a.github ? `<a href="https://github.com/${esc(a.github)}" target="_blank">${esc(a.github)}</a>` : '—';
+  document.getElementById('d-memo').textContent = a.memo || '';
+  document.getElementById('d-memo-section').style.display = a.memo ? 'block' : 'none';
+}
+
+function closeDetail() { document.getElementById('detail-panel').classList.remove('open'); }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ============================================================
+// 起動
+// ============================================================
+(async () => {
+  useSupabase = await initSupabase();
+  await loadApps();
+})();
+</script>
+</body>
+</html>
