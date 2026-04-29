@@ -186,6 +186,7 @@
   <div class="detail-body">
     <div class="detail-section">
       <div class="section-title">基本情報</div>
+      <div class="drow"><span class="dkey" style="font-weight:700">🔑 Excel ID</span><span class="dval" id="d-id" style="font-size:16px;font-weight:700;color:var(--blue);font-family:monospace"></span></div>
       <div class="drow"><span class="dkey">説明</span><span class="dval" id="d-desc"></span></div>
       <div class="drow"><span class="dkey">開始日</span><span class="dval" id="d-start"></span></div>
       <div class="drow"><span class="dkey">リリース日</span><span class="dval" id="d-date"></span></div>
@@ -319,7 +320,10 @@ function render() {
       </div>
       <div class="card-bottom">
         <span>${esc(a.stack||'スタック未記入')}</span>
-        <span>${a.release_date||'日付未設定'}</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <span style="background:var(--bg);border:0.5px solid var(--border-em);border-radius:4px;padding:1px 6px;font-size:10px;color:var(--text-hint);font-family:monospace">ID ${a.id}</span>
+          <span>${a.release_date||'日付未設定'}</span>
+        </span>
       </div>
     </div>
   `).join('');
@@ -406,6 +410,7 @@ function openDetail(id) {
 
 function refreshDetail() {
   const a = detailApp;
+  document.getElementById('d-id').textContent = a.id;
   document.getElementById('d-name').textContent = a.name;
   document.getElementById('d-badge').innerHTML = `<span class="badge s-${a.status}">${a.status}</span>`;
   document.getElementById('d-desc').textContent = a.description || '—';
