@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>App Overview | UDS</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./config.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -216,10 +215,8 @@ let sbClient = null;
 
 async function initSupabase() {
   try {
-    const res = await fetch('./config.js');
-    if (!res.ok) throw new Error('config.js not found');
     // config.js が存在すれば window.SUPABASE_URL / window.SUPABASE_ANON_KEY がセットされる
-    await import('./config.js').catch(() => {});
+    await import('./config.js');
     if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
       sbClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
       return true;
